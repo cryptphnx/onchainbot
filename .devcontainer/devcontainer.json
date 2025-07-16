@@ -1,0 +1,44 @@
+{
+  // Friendly name in the Codespaces UI
+  "name": "MirrorBot Dev • Ubuntu 22.04",
+
+  // 1️⃣  Base image (Ubuntu 22.04) — works everywhere
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+  // 2️⃣  Features = zero-maintenance installers
+  //     Docs: https://containers.dev/features
+ "features": {
+  "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+  "ghcr.io/devcontainers/features/python:1": { "version": "3.12" },
+  "ghcr.io/devcontainers-contrib/features/pipx-package:1": {
+    "package": "black",
+    "injections": "isort pytest"
+  }
+},
+
+  // 3️⃣  Commands that run **inside** the container after it’s built
+  "postCreateCommand": [
+    // Install OpenAI Codex CLI globally
+    "npm install -g @openai/codex",
+    // Small sanity check
+    "node -v && python --version && codex --help | head -n 3"
+  ],
+
+  // 4️⃣  VS Code settings & extensions that auto-install
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.tabSize": 2,
+        "python.formatting.provider": "black"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-azuretools.vscode-docker",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+
+  // 5️⃣  Use the default “vscode” user (UID 1000) instead of root
+  "remoteUser": "vscode"
+}
