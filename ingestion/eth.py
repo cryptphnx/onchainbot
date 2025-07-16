@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 import websockets
-from eth_abi import decode_abi
+from eth_abi import decode as decode_abi
 from web3.exceptions import ABIFunctionNotFound
 from web3 import Web3
 

@@ -89,6 +89,12 @@ def test_decode_jito_non_swap():
 @pytest.mark.asyncio
 async def test_get_jupiter_price(monkeypatch):
     class DummyResp:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            pass
+
         async def json(self):
             return {"data": [{"price": 42}]}
 
