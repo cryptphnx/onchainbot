@@ -1,147 +1,150 @@
+"""
+Async ingestion of pending Ethereum swaps (Uniswap V2/V3 and 1inch) via Alchemy websocket.
+"""
 import asyncio
 import json
-import logging
 import os
+import time
+from asyncio import Queue
+from decimal import Decimal
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import redis.asyncio as redis
+import structlog
 import websockets
 from eth_abi import decode_abi
-from eth_utils import keccak, to_hex
+from web3.exceptions import ABIFunctionNotFound
+from web3 import Web3
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-logger = logging.getLogger(__name__)
+# Structured logger
+structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
+logger = structlog.get_logger()
 
-# Environment/config variables
-ALCHEMY_API_KEY: str = os.getenv("ALCHEMY_API_KEY", "")
-if not ALCHEMY_API_KEY:
-    logger.error("ALCHEMY_API_KEY is not set")
+# Configuration
+ALCHEMY_WS_URL: str = os.getenv("ALCHEMY_WS_URL", "")
+if not ALCHEMY_WS_URL:
+    logger.error("ALCHEMY_WS_URL is not set; aborting startup")
 
-WS_URL: str = f"wss://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
-REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-WALLETS_FILE: str = os.getenv("WALLETS_FILE", "wallets.json")
-REDIS_CHANNEL: str = os.getenv("REDIS_CHANNEL", "uniswap_v3_swaps")
+WALLETS_FILE = Path(os.getenv("WALLETS_FILE", "wallets.json"))
 
-# Uniswap V3 Swap event signature
-_SWAP_SIG_TEXT = "Swap(address,address,int256,int256,uint160,uint128,int24)"
-_SWAP_TOPIC0: str = to_hex(keccak(text=_SWAP_SIG_TEXT))
+# Known router addresses
+UNISWAP_V2_ROUTER = Web3.to_checksum_address("0x7a250d5630B4cF539739DF2C5dAcb4c659F2488D")
+UNISWAP_V3_ROUTER = Web3.to_checksum_address("0xE592427A0AEce92De3Edee1f18E0157C05861564")
+ONEINCH_ROUTER = Web3.to_checksum_address("0x11111112542d85b3ef69ae05771c2dccff4faa26")
 
-async def load_wallets(path: str) -> List[str]:
+# Event bus for downstream consumers
+event_bus: Queue[Dict[str, Any]] = Queue()
+
+
+async def load_wallets(path: Path) -> List[str]:
     """
-    Load wallet addresses from a JSON file. Expects a JSON array of hex strings.
-    """
-    try:
-        with open(path, mode="r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception as e:
-        logger.exception("Failed to load wallets file '%s'", path)
-        return []
-    # Normalize to lowercase for comparison
-    return [addr.lower() for addr in data if isinstance(addr, str)]
-
-def decode_swap_event(log: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Decode a Uniswap V3 Swap event log into a dict.
-    Returns None if the log is not a Swap event.
+    Load ETH wallet addresses from a JSON file. Expects a list of dicts with 'chain'=='ETH'.
+    Returns checksum-format addresses.
     """
     try:
-        topics = log.get("topics", [])
-        if not topics or topics[0] != _SWAP_TOPIC0:
-            return None
-        # Indexed parameters: sender and recipient
-        sender = "0x" + topics[1][-40:]
-        recipient = "0x" + topics[2][-40:]
-        # Data contains: amount0(int256), amount1(int256), sqrtPriceX96(uint160), liquidity(uint128), tick(int24)
-        data_bytes = bytes.fromhex(log.get("data", "")[2:])
-        amount0, amount1, sqrt_price_x96, liquidity, tick = decode_abi(
-            ["int256", "int256", "uint160", "uint128", "int24"], data_bytes
-        )
-        return {
-            "transactionHash": log.get("transactionHash"),
-            "logIndex": int(log.get("logIndex", "0x0"), 16),
-            "blockNumber": int(log.get("blockNumber", "0x0"), 16),
-            "sender": sender.lower(),
-            "recipient": recipient.lower(),
-            "amount0": amount0,
-            "amount1": amount1,
-            "sqrtPriceX96": sqrt_price_x96,
-            "liquidity": liquidity,
-            "tick": tick,
-        }
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        logger.exception("Failed to decode log: %s", log)
+        logger.exception("loading wallets file failed", path=path)
+        return []
+    addrs: List[str] = []
+    for entry in data:
+        try:
+            if entry.get("chain") == "ETH":
+                addrs.append(Web3.to_checksum_address(entry["address"]))
+        except Exception:
+            logger.exception("invalid wallet entry skipped", entry=entry)
+    return addrs
+
+
+def decode_v2_swap(tx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Decode Uniswap V2 swapExactTokensForTokens calls.
+    """
+    try:
+        if Web3.to_checksum_address(tx.get("to", "")) != UNISWAP_V2_ROUTER:
+            return None
+        data = tx.get("input", "")
+        b = bytes.fromhex(data[2:])
+        sig = b[:4]
+        # swapExactTokensForTokens(uint256,uint256,address[],address,uint256)
+        sig_expected = Web3.keccak(text="swapExactTokensForTokens(uint256,uint256,address[],address,uint256)")[:4]
+        if sig != sig_expected:
+            return None
+        args = decode_abi(
+            ["uint256", "uint256", "address[]", "address", "uint256"], b[4:]
+        )
+        amount_in, amount_out_min, path, recipient, deadline = args
+        return {
+            "wallet": tx.get("from"),
+            "tokenIn": path[0],
+            "tokenOut": path[-1],
+            "amountIn": Decimal(amount_in),
+            "amountOutMin": Decimal(amount_out_min),
+            "txHash": tx.get("hash"),
+            "timestamp": int(time.time()),
+        }
+    except ABIFunctionNotFound:
+        return None
+    except Exception:
+        logger.exception("v2 decode failed", tx_hash=tx.get("hash"))
         return None
 
-async def publish_event(
-    redis_client: redis.Redis, channel: str, message: Dict[str, Any]
-) -> None:
-    """
-    Publish a JSON message to a Redis channel.
-    """
-    try:
-        await redis_client.publish(channel, json.dumps(message))
-    except Exception:
-        logger.exception("Failed to publish message to Redis: %s", message)
 
-async def subscribe_and_process(wallets: List[str]) -> None:
+def decode_v3_swap(tx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Connect to Alchemy WS, subscribe to Swap logs, decode and forward relevant events.
+    Decode Uniswap V3 exactInputSingle calls.
     """
-    # Create Redis client
-    redis_client = redis.from_url(REDIS_URL)
-    try:
-        async with websockets.connect(WS_URL) as ws:
-            # Subscribe to all Swap events
-            subscribe_payload = {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "eth_subscribe",
-                "params": ["logs", {"topics": [_SWAP_TOPIC0]}],
-            }
-            await ws.send(json.dumps(subscribe_payload))
-            logger.info("Subscribed to Uniswap V3 Swap events: topic=%s", _SWAP_TOPIC0)
+    # TODO: implement V3 decoding
+    return None
 
-            # Listen for incoming logs
-            while True:
-                message = await ws.recv()
-                data = json.loads(message)
-                params = data.get("params")
-                if not params:
-                    continue
-                log = params.get("result")
-                if not log:
-                    continue
-                event = decode_swap_event(log)
-                if not event:
-                    continue
-                # Filter by monitored wallets
-                if event["sender"] in wallets or event["recipient"] in wallets:
-                    await publish_event(redis_client, REDIS_CHANNEL, event)
-                    logger.info(
-                        "Published Swap event tx=%s logIndex=%d",
-                        event["transactionHash"], event["logIndex"],
-                    )
-    except Exception:
-        logger.exception("WebSocket connection failed or closed.")
-    finally:
-        await redis_client.close()
+
+def decode_1inch_swap(tx: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Decode 1inch swap transactions.
+    """
+    # TODO: implement 1inch decoding
+    return None
+
+
+async def subscribe_pending(addresses: List[str]) -> None:
+    """
+    Subscribe to Alchemy pending transactions for given addresses and push swaps to event_bus.
+    """
+    backoff = 1
+    while True:
+        try:
+            async with websockets.connect(ALCHEMY_WS_URL) as ws:
+                sub = {"jsonrpc": "2.0", "id": 0,
+                       "method": "alchemy_pendingTransactions",
+                       "params": [{"fromAddress": addresses}]}
+                await ws.send(json.dumps(sub))
+                logger.info("subscribed", method="alchemy_pendingTransactions")
+                backoff = 1
+                async for msg in ws:
+                    data = json.loads(msg)
+                    tx = data.get("params", {}).get("result")
+                    if not tx or tx.get("from") not in addresses:
+                        continue
+                    evt = decode_v2_swap(tx) or decode_v3_swap(tx) or decode_1inch_swap(tx)
+                    if evt:
+                        await event_bus.put(evt)
+                        logger.info("swap event queued", tx_hash=evt.get("txHash"))
+        except Exception:
+            logger.exception("connection error, retrying in %s seconds", backoff)
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 30)
+
 
 async def main() -> None:
     """
-    Entry point: Load wallets and run the subscription loop.
+    Load wallets and start the pending transaction subscriber.
     """
-    wallets = await load_wallets(WALLETS_FILE)
-    if not wallets:
-        logger.error("No wallets to monitor. Exiting.")
+    addresses = await load_wallets(WALLETS_FILE)
+    if not addresses:
+        logger.error("no eth wallets, exiting")
         return
-    await subscribe_and_process(wallets)
+    await subscribe_pending(addresses)
+
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Shutting down subscriber.")
+    asyncio.run(main())
