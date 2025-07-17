@@ -25,8 +25,8 @@ import aiohttp
 import structlog
 from decimal import Decimal
 from solana.rpc.async_api import AsyncClient
-from solana.keypair import Keypair
-from solana.transaction import VersionedTransaction
+from solders.keypair import Keypair
+from solders.transaction import VersionedTransaction
 
 from core.positions import TradeEvent, Position
 
@@ -45,7 +45,7 @@ _keypair_json = os.getenv("SOLANA_PRIVATE_KEY_JSON")
 if _keypair_json:
     try:
         _seed = bytes(json.loads(_keypair_json))
-        KEYPAIR = Keypair.from_secret_key(_seed)
+        KEYPAIR = Keypair.from_bytes(_seed)
     except Exception as err:
         raise RuntimeError(f"Failed to load SOLANA_PRIVATE_KEY_JSON: {err}")
 else:
@@ -53,7 +53,7 @@ else:
     try:
         with open(_path, encoding="utf-8") as f:
             _seed = bytes(json.loads(f.read()))
-        KEYPAIR = Keypair.from_secret_key(_seed)
+        KEYPAIR = Keypair.from_bytes(_seed)
     except Exception as err:
         raise RuntimeError(
             f"SOLANA_PRIVATE_KEY_JSON not set and failed to load keypair at {_path}: {err}"
