@@ -1,0 +1,12 @@
+aiohttp
+structlog
+websockets
+pydantic
+web3
+eth-account
+pyflashbots>=0.6.0
+solana
+eth-abi
+pytest
+pytest-asyncio
+prometheus_client
