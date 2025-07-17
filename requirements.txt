@@ -4,9 +4,12 @@ websockets
 pydantic
 web3
 eth-account
+eth-typing>=3.0.0
 pyflashbots>=0.6.0
 solana
 eth-abi
+python-dotenv
+pandas
 pytest
 pytest-asyncio
 prometheus_client

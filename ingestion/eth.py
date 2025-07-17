@@ -25,7 +25,7 @@ ALCHEMY_WS_URL: str = os.getenv("ALCHEMY_WS_URL", "")
 if not ALCHEMY_WS_URL:
     logger.error("ALCHEMY_WS_URL is not set; aborting startup")
 
-WALLETS_FILE = Path(os.getenv("WALLETS_FILE", "wallets.json"))
+ETH_WALLETS_FILE = Path(os.getenv("ETH_WALLETS_FILE", "wallets_eth.json"))
 
 # Known router addresses
 UNISWAP_V2_ROUTER = Web3.to_checksum_address("0x7a250d5630B4cF539739DF2C5dAcb4c659F2488D")
@@ -139,7 +139,7 @@ async def main() -> None:
     """
     Load wallets and start the pending transaction subscriber.
     """
-    addresses = await load_wallets(WALLETS_FILE)
+    addresses = await load_wallets(ETH_WALLETS_FILE)
     if not addresses:
         logger.error("no eth wallets, exiting")
         return

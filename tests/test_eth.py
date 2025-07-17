@@ -19,7 +19,7 @@ from ingestion.eth import (
 @pytest.mark.asyncio
 async def test_load_wallets(tmp_path):
     """Test that load_wallets correctly reads ETH addresses."""
-    file = tmp_path / "wallets.json"
+    file = tmp_path / "wallets_eth.json"
     content = [
         {"chain": "ETH", "address": "0x0000000000000000000000000000000000000000"},
         {"chain": "SOL", "address": "irrelevant"},

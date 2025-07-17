@@ -19,7 +19,8 @@ A mirror trading bot for Ethereum and Solana DeFi protocols.
 ├── exec/               # Execution modules for mirroring trades on ETH and SOL
 ├── src/onchainbot/     # Optional packaged CLI or integrations
 ├── tests/              # Unit tests
-├── wallets.json        # Sample wallet configuration file
+├── wallets_eth.json    # Sample Ethereum wallet configuration file
+├── wallets_sol.json    # Sample Solana wallet configuration file
 ├── requirements.txt    # Python dependencies
 ├── pytest.ini          # Pytest configuration
 └── README.md           # Project overview and usage
@@ -41,7 +42,8 @@ Environment variables are used to configure endpoints and credentials:
 - `ALCHEMY_WS_URL`  : WebSocket URL for Ethereum pending tx ingestion (Alchemy).
 - `HELIUS_WS_URL`   : WebSocket URL for Solana Helius enhanced events.
 - `JITO_SHRED_URL`  : WebSocket URL for Solana Jito shardstream.
-- `WALLETS_FILE`    : Path to `wallets.json` with wallet list (default `wallets.json`).
+- `ETH_WALLETS_FILE`      : Path to `wallets_eth.json` with wallet list for ETH (default `wallets_eth.json`).
+- `SOL_WALLETS_FILE`      : Path to `wallets_sol.json` with wallet list for SOL (default `wallets_sol.json`).
 
 ### Execution
 - `ETH_RPC_URL`          : JSON-RPC URL for Ethereum node.

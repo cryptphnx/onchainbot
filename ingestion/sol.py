@@ -22,7 +22,7 @@ logger = structlog.get_logger()
 # Configuration
 HELIUS_WS_URL: str = os.getenv("HELIUS_WS_URL", "")
 JITO_SHRED_URL: str = os.getenv("JITO_SHRED_URL", "")
-WALLETS_FILE = Path(os.getenv("WALLETS_FILE", "wallets.json"))
+SOL_WALLETS_FILE = Path(os.getenv("SOL_WALLETS_FILE", "wallets_sol.json"))
 
 # Local event bus for downstream consumers
 event_bus: Queue[Dict[str, Any]] = Queue()
@@ -205,7 +205,7 @@ async def main() -> None:
     """
     Load SOL wallets and run both Helius and Jito subscribers concurrently.
     """
-    addrs = await load_wallets(WALLETS_FILE)
+    addrs = await load_wallets(SOL_WALLETS_FILE)
     if not addrs:
         logger.error("no SOL wallets, exiting")
         return
