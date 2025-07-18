@@ -32,6 +32,7 @@ Install the required Python packages:
 
 ```bash
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Configuration
@@ -100,4 +101,11 @@ Run the full test suite with:
 
 ```bash
 pytest -q
+```
+
+If you plan to execute the Jupyter notebook tests (e.g. `notebooks/bot_tests.ipynb`), first install the project and its dependencies in editable mode, then launch your notebook server from the project root and restart the kernel:
+
+```bash
+pip install -r requirements.txt
+pip install -e .
 ```
