@@ -34,7 +34,8 @@
       "extensions": [
         "ms-python.python",
         "ms-azuretools.vscode-docker",
-        "esbenp.prettier-vscode"
+        "esbenp.prettier-vscode",
+        "ms-toolsai.jupyter"
       ]
     }
   },
