@@ -21,7 +21,7 @@
     // Install OpenAI Codex CLI globally
     "npm install -g @openai/codex@latest",
     "npm install -g @openai/codex",
-    "echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc",
+    "echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc && source ~/.bashrc",
     // Small sanity check
     "node -v && python --version && codex --help | head -n 3",
     // Install git lfs
