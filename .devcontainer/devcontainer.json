@@ -10,6 +10,9 @@
  "features": {
   "ghcr.io/devcontainers/features/node:1": { "version": "22" },
   "ghcr.io/devcontainers/features/python:1": { "version": "3.12" },
+  "ghcr.io/devcontainers/features/git:1": { "version": "2.50.1" },
+  "ghcr.io/devcontainers/features/git-lfs:1": { "version": "3.7.0"},
+  "ghcr.io/jsburckhardt/devcontainer-features/codex:1": { "version": "0.7"},
   "ghcr.io/devcontainers-contrib/features/pipx-package:1": {
     "package": "black",
     "injections": "isort pytest"
@@ -19,14 +22,7 @@
   // 3️⃣  Commands that run **inside** the container after it’s built
   "postCreateCommand": [
     // Install OpenAI Codex CLI globally
-    "npm install -g @openai/codex@latest",
-    "npm install -g @openai/codex",
-    "echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc && source ~/.bashrc",
-    // Small sanity check
-    "node -v && python --version && codex --help | head -n 3",
-    // Install git lfs
-    "sudo apt install git-lfs",
-    "git lfs install"
+    "npm install -g @openai/codex@latest"
   ],
 
   // 4️⃣  VS Code settings & extensions that auto-install
