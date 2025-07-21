@@ -21,8 +21,8 @@
 
   // 3️⃣  Commands that run **inside** the container after it’s built
   "postCreateCommand": [
-    // Install OpenAI Codex CLI globally
-    "npm install -g @openai/codex@latest"
+    // Install pip requirements.txt
+    "pip install -r requirements.txt"
   ],
 
   // 4️⃣  VS Code settings & extensions that auto-install
