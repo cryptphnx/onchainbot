@@ -19,9 +19,14 @@
   // 3️⃣  Commands that run **inside** the container after it’s built
   "postCreateCommand": [
     // Install OpenAI Codex CLI globally
+    "npm install -g @openai/codex@latest",
     "npm install -g @openai/codex",
+    "echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc",
     // Small sanity check
-    "node -v && python --version && codex --help | head -n 3"
+    "node -v && python --version && codex --help | head -n 3",
+    // Install git lfs
+    "sudo apt install git-lfs",
+    "git lfs install"
   ],
 
   // 4️⃣  VS Code settings & extensions that auto-install
